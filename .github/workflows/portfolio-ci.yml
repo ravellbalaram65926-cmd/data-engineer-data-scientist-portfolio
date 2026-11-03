@@ -2,26 +2,106 @@ name: Portfolio CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  validate-portfolio:
+  project-checks:
+    name: ${{ matrix.project }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - retail-demand-forecasting
+          - real-time-fraud-detection
+          - end-to-end-mlops-platform
+          - customer-analytics-warehouse
+          - rag-document-search-pipeline
+          - recommendation-engine-at-scale
+          - iot-energy-demand-forecasting
+          - data-quality-and-anomaly-monitoring
     steps:
-      - name: Checkout repo
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ${{ matrix.project }}/requirements.txt
 
-      - name: Install dependencies
+      - name: Install project dependencies and quality tools
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          python -m pip install -r "${{ matrix.project }}/requirements.txt" pytest ruff
 
-      - name: Validate Python files
+      - name: Compile project
+        run: python -m compileall "${{ matrix.project }}/src" "${{ matrix.project }}/tests"
+
+      - name: Lint project
+        run: python -m ruff check "${{ matrix.project }}/src" "${{ matrix.project }}/tests"
+
+      - name: Test project
+        working-directory: ${{ matrix.project }}
+        run: python -m pytest -q tests
+
+      - name: Run project pipeline
+        working-directory: ${{ matrix.project }}
+        run: python src/main.py
+
+  automation-tests:
+    name: Validate notification helper
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test email notification
+        run: python -m unittest scripts.test_send_success_email
+
+  email-success:
+    name: Email portfolio success
+    needs: [project-checks, automation-tests]
+    if: ${{ success() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Require mail credentials
+        env:
+          PORTFOLIO_EMAIL_USERNAME: ${{ secrets.PORTFOLIO_EMAIL_USERNAME }}
+          PORTFOLIO_EMAIL_APP_PASSWORD: ${{ secrets.PORTFOLIO_EMAIL_APP_PASSWORD }}
         run: |
-          python -m compileall .
+          if [ -z "$PORTFOLIO_EMAIL_USERNAME" ] || [ -z "$PORTFOLIO_EMAIL_APP_PASSWORD" ]; then
+            echo "::error::Configure PORTFOLIO_EMAIL_USERNAME and PORTFOLIO_EMAIL_APP_PASSWORD repository secrets to enable success emails."
+            exit 1
+          fi
+      - name: Send success email
+        env:
+          PORTFOLIO_EMAIL_USERNAME: ${{ secrets.PORTFOLIO_EMAIL_USERNAME }}
+          PORTFOLIO_EMAIL_APP_PASSWORD: ${{ secrets.PORTFOLIO_EMAIL_APP_PASSWORD }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: python scripts/send_success_email.py

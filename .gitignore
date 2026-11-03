@@ -10,3 +10,6 @@ __pycache__/
 htmlcov/
 .mypy_cache/
 .pyre
+**/data/gold/
+**/data/external/
+**/*.sqlite
