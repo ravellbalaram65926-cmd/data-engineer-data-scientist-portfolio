@@ -2,7 +2,12 @@ import unittest
 from email.message import EmailMessage
 from unittest.mock import patch
 
-from scripts.send_success_email import RECIPIENT, build_message, main
+from scripts.send_success_email import (
+    RECIPIENT,
+    build_message,
+    main,
+    send_success_email,
+)
 
 
 class SuccessEmailTests(unittest.TestCase):
@@ -18,6 +23,21 @@ class SuccessEmailTests(unittest.TestCase):
         self.assertIn("all eight portfolio pipelines", message.get_content().lower())
         self.assertIn("abc123", message.get_content())
         self.assertIn("/runs/10", message.get_content())
+
+    @patch("scripts.send_success_email.smtplib.SMTP_SSL")
+    def test_sends_using_gmail_smtp(self, smtp_ssl):
+        server = smtp_ssl.return_value.__enter__.return_value
+        send_success_email(
+            "sender@example.com",
+            "app-password",
+            "owner/repository",
+            "abc123",
+            "https://github.com/owner/repository/actions/runs/10",
+        )
+        server.login.assert_called_once_with("sender@example.com", "app-password")
+        sent = server.send_message.call_args.args[0]
+        self.assertEqual(sent["To"], RECIPIENT)
+        self.assertIn("abc123", sent.get_content())
 
     @patch.dict(
         "os.environ",

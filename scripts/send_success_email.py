@@ -10,7 +10,9 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
 
 
-def build_message(sender: str, repository: str, commit: str, run_url: str) -> EmailMessage:
+def build_message(
+    sender: str, repository: str, commit: str, run_url: str
+) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = "Portfolio pipelines successful"
     message["From"] = sender
@@ -25,6 +27,26 @@ def build_message(sender: str, repository: str, commit: str, run_url: str) -> Em
     return message
 
 
+def send_success_email(
+    username: str,
+    password: str,
+    repository: str,
+    commit: str,
+    run_url: str,
+) -> None:
+    if not username or not password:
+        raise RuntimeError(
+            "Set PORTFOLIO_EMAIL_USERNAME and PORTFOLIO_EMAIL_APP_PASSWORD "
+            "as environment variables or GitHub Actions secrets."
+        )
+    message = build_message(username, repository, commit, run_url)
+    with smtplib.SMTP_SSL(
+        SMTP_HOST, SMTP_PORT, context=ssl.create_default_context()
+    ) as server:
+        server.login(username, password)
+        server.send_message(message)
+
+
 def main() -> None:
     username = os.environ.get("PORTFOLIO_EMAIL_USERNAME", "")
     password = os.environ.get("PORTFOLIO_EMAIL_APP_PASSWORD", "")
@@ -33,21 +55,13 @@ def main() -> None:
     server_url = os.environ["GITHUB_SERVER_URL"].rstrip("/")
     run_id = os.environ["GITHUB_RUN_ID"]
     run_number = os.environ["GITHUB_RUN_NUMBER"]
-    if not username or not password:
-        raise RuntimeError(
-            "Set PORTFOLIO_EMAIL_USERNAME and PORTFOLIO_EMAIL_APP_PASSWORD "
-            "as GitHub Actions secrets."
-        )
-
-    message = build_message(
+    send_success_email(
         username,
+        password,
         repository,
         commit,
         f"{server_url}/{repository}/actions/runs/{run_id}",
     )
-    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ssl.create_default_context()) as server:
-        server.login(username, password)
-        server.send_message(message)
     print(f"Success email sent to {RECIPIENT} for workflow run #{run_number}.")
 
 

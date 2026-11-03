@@ -1,7 +1,6 @@
 import zipfile
 
 import pytest
-
 from scripts.download_kaggle import extract_archives
 
 
