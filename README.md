@@ -23,7 +23,7 @@ Open a project above for its dataset, how to run it, and details of its flow.
 
 ## Local ETL / ELT demos
 
-Each project includes a small synthetic sample dataset and an executable pipeline in `src/main.py`. From a project folder, run `python src/main.py`; run its tests with `python -m pytest -q tests`. To run all eight demos and tests, use `python scripts/run_portfolio.py` from the repository root (or add `--pipelines-only` / `--tests-only`). Outputs are reproducible and ignored by Git.
+Each project includes a small synthetic sample dataset and an executable pipeline in `src/main.py`. From a project folder, run `python src/main.py`; run its tests with `python -m pytest -q tests`. To run all eight pipelines and tests, use `python scripts/run_portfolio.py` from the repository root (or add `--pipelines-only` / `--tests-only`). Outputs are reproducible and ignored by Git.
 
 The sample fixtures are for workflow demonstrations, not real-world model evaluation. Project READMEs identify public dataset sources and access notes. Keep larger or access-controlled data in `data/external/`; that path is Git-ignored. Never commit secrets, personal data, or raw data whose terms do not allow redistribution.
 
@@ -33,7 +33,8 @@ Yes—Kaggle datasets can be used as inputs. Choose a dataset and review its lic
 
 ## Automated quality and dependency checks
 
-- **Portfolio CI** runs on pull requests, pushes to `main` or `master`, every Monday at 05:03 UTC, and manual dispatch. An eight-project matrix compiles, lints with Ruff, and runs each project's pytest suite. Dependency caching and concurrency cancellation keep repeat runs efficient.
+- **Portfolio CI** runs on pull requests, pushes to `main` or `master`, daily at 18:00 UTC, and manual dispatch. An eight-project matrix compiles, lints with Ruff, runs each project's pytest suite, and executes each pipeline. Dependency caching and concurrency cancellation keep repeat runs efficient.
+- After successful non-PR runs, the workflow emails `ravellabalaram65926@gmail.com`. To enable delivery, add GitHub repository secrets `PORTFOLIO_EMAIL_USERNAME` (the sending Gmail address) and `PORTFOLIO_EMAIL_APP_PASSWORD` (a Gmail app password; requires Google 2-Step Verification). The workflow intentionally fails its email job with a clear error if these secrets are not configured. Pull-request runs do not send email or receive SMTP secrets.
 - **Dependency audit** runs every Monday at 05:23 UTC or on manual dispatch. It audits each project's declared Python requirements with `pip-audit` and fails when known vulnerabilities are found.
 - **Dependabot** checks Python dependencies in each project and GitHub Actions weekly. It groups minor and patch updates to reduce review noise; major updates remain separate.
 - Both workflows use read-only repository permissions and do not publish artifacts or modify source files.

@@ -5,7 +5,7 @@ on:
     branches: [main, master]
   pull_request:
   schedule:
-    - cron: "3 5 * * 1"
+    - cron: "0 18 * * *"
   workflow_dispatch:
 
 permissions:
@@ -56,3 +56,52 @@ jobs:
       - name: Test project
         working-directory: ${{ matrix.project }}
         run: python -m pytest -q tests
+
+      - name: Run project pipeline
+        working-directory: ${{ matrix.project }}
+        run: python src/main.py
+
+  automation-tests:
+    name: Validate notification helper
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test email notification
+        run: python -m unittest scripts.test_send_success_email
+
+  email-success:
+    name: Email portfolio success
+    needs: [project-checks, automation-tests]
+    if: ${{ success() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Require mail credentials
+        env:
+          PORTFOLIO_EMAIL_USERNAME: ${{ secrets.PORTFOLIO_EMAIL_USERNAME }}
+          PORTFOLIO_EMAIL_APP_PASSWORD: ${{ secrets.PORTFOLIO_EMAIL_APP_PASSWORD }}
+        run: |
+          if [ -z "$PORTFOLIO_EMAIL_USERNAME" ] || [ -z "$PORTFOLIO_EMAIL_APP_PASSWORD" ]; then
+            echo "::error::Configure PORTFOLIO_EMAIL_USERNAME and PORTFOLIO_EMAIL_APP_PASSWORD repository secrets to enable success emails."
+            exit 1
+          fi
+      - name: Send success email
+        env:
+          PORTFOLIO_EMAIL_USERNAME: ${{ secrets.PORTFOLIO_EMAIL_USERNAME }}
+          PORTFOLIO_EMAIL_APP_PASSWORD: ${{ secrets.PORTFOLIO_EMAIL_APP_PASSWORD }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: python scripts/send_success_email.py
