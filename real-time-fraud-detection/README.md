@@ -3,8 +3,19 @@
 ## Problem
 Flag fraudulent card transactions within seconds of arrival.
 
-## Data
-Credit Card Fraud or synthetic stream
+## Dataset and provenance
+
+Committed `data/raw/sample_transactions.csv` is synthetic only. A real benchmark is the [ULB credit-card fraud dataset on Kaggle](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud); Kaggle account/rules apply. Keep it under ignored `data/external/` and map its schema locally; do not commit cardholder or raw transaction data.
+
+### Download the Kaggle dataset
+
+The downloader defaults to `mlg-ulb/creditcardfraud`. Install the Kaggle CLI with `python -m pip install kaggle`, create an API token in Kaggle account settings, and save `kaggle.json` to `%USERPROFILE%\.kaggle\kaggle.json` on Windows or `~/.kaggle/kaggle.json` on macOS/Linux. Run `python scripts/download_kaggle.py`; files go to ignored `data/external/`. The public data's columns differ from the demo schema, so adapt them before using it as pipeline input. Do not commit raw transaction data.
+
+## Run the ETL demo
+
+From this directory, run `python src/main.py`. The pipeline deduplicates transaction IDs, orders events by card/time, derives prior-only 10-minute velocity features, and emits an explicitly labeled example threshold rule in `data/gold/scored_transactions.csv`. This rule is a teaching baseline, not a trained or production fraud model. Re-running replaces the same deterministic output.
+
+Run checks with `python -m pytest -q tests`.
 
 ## Stack
 Kafka, Spark Structured Streaming, XGBoost, Docker, dashboard
@@ -46,7 +57,6 @@ real-time-fraud-detection/
 +-- tests/
 +-- notebooks/
 +-- docs/
-+-- .github/workflows/ci.yml
 `
 
 ## Resume line
